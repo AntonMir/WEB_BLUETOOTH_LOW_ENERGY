@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<!-- saved from url=(0053)https://www.mikethedane.com/codeless/codeless_v2.html -->
+<html lang="en-US">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+
+        <title>CodeLess Web Bluetooth Application</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+        <script>
+            var inboundChar
+            var outboundChar
+            var device
+            var service
+            var imu_acc_ntf
+
+            // Define the CodeLess UUIDs
+            var CODELESS_SVC_UUID = '866d3b04-e674-40dc-9c05-b7f91bec6e83'
+            var INBOUND_CHAR_UUID = '914f8fb9-e8cd-411d-b7d1-14594de45425'
+            var OUTBOUND_CHAR_UUID = '3bb535aa-50b2-4fbe-aa09-6b06dc59a404'
+            var CNTRL_CHAR_UUID = 'e2048b39-d4f9-4a45-9f25-1856c10d5639'
+            var SMART_INSURANCE_SERVICE = '74ab521e-060d-46df-aa64-cf4df2d0d640'
+            var IMU_SERVICE = 'a4e649f4-4be5-11e5-885d-feff819cdc9f'
+            var IMU_ACC_UUID = 'c4c1f6e2-4be5-11e5-885d-feff819cdc9f'
+
+            // Display text in log field text area
+            function log(text) {
+                var textarea = document.getElementById('log')
+                textarea.value += '\n' + text
+                textarea.scrollTop = textarea.scrollHeight
+            }
+
+            // Incoming GATT notification was received
+            async function incomingData(event) {
+                log('Notification!\n')
+                //let value = event.target.value;
+                //let a = [];
+                // Convert raw data bytes to hex values just for the sake of showing something.
+                // In the "real" world, you'd use data.getUint8, data.getUint16 or even
+                // TextDecoder to process raw data bytes.
+                //for (let i = 0; i < value.byteLength; i++) {
+                //	a.push('0x' + ('00' + value.getUint8(i).toString(16)).slice(-2));
+                //	}
+                //log('> ' + a.join(' '));
+            }
+
+            async function onDisconnected() {
+                log('Bluetooth connection terminated!')
+            }
+
+            async function bleDisconnect() {
+                log('Disconnecting')
+                if (device.gatt.connected) {
+                    device.gatt.disconnect()
+                } else {
+                    log('> Bluetooth Device is already disconnected')
+                }
+            }
+
+            // Scan, connect and explore CodeLess BLE device
+            async function ble_connect() {
+                try {
+                    // Define a scan filter and prepare for interaction with Codeless Service
+                    log('Requesting Bluetooth Device...')
+                    // let options = {
+                    //     filters: [{ name: 'spi_acc' }],
+                    //     optionalServices: [IMU_SERVICE],
+                    // }
+                    device = await navigator.bluetooth.requestDevice({
+                        acceptAllDevices: true,
+                        optionalServices: [SMART_INSURANCE_SERVICE],
+                    })
+                    // device = await navigator.bluetooth.requestDevice(options)
+                    device.addEventListener('gattserverdisconnected', onDisconnected)
+                    // Connect to device GATT and perform attribute discovery
+                    server = await device.gatt.connect()
+                    service = await server.getPrimaryService(SMART_INSURANCE_SERVICE)
+                    // inboundChar = await service.getCharacteristic(INBOUND_CHAR_UUID)
+                    // outboundChar = await service.getCharacteristic(OUTBOUND_CHAR_UUID)
+
+                    imu_acc_ntf = await service.getCharacteristic(SMART_INSURANCE_SERVICE)
+                    // Subscribe to notifications
+                    imu_acc_ntf.addEventListener('characteristicvaluechanged', incomingData)
+                    //document.querySelector('#startNotifications').disabled = false;
+                    //document.querySelector('#stopNotifications').disabled = true;
+                    //await imu_acc_ntf.startNotifications();
+                    log('Device is ready to communicate!\n')
+                } catch (error) {
+                    log('Failed: ' + error)
+                }
+            }
+
+            // Send an AT command to the CodeLess BLE peer
+            async function sendAT(cmd) {
+                try {
+                    log('Starting Notifications...')
+                    await await imu_acc_ntf.startNotifications()
+                    log('> Notifications started')
+                    //document.querySelector('#startNotifications').disabled = true;
+                    //document.querySelector('#stopNotifications').disabled = false;
+                } catch (error) {
+                    log('Argh! ' + error)
+                }
+            }
+
+            // If enter key was pressed by user while editing, send command immediately
+            function wasEnter(elem) {
+                if (event.key === 'Enter') {
+                    sendAT(document.getElementById('cmd').value)
+                }
+            }
+        </script>
+    </head>
+
+    <body data-new-gr-c-s-check-loaded="14.998.0" data-gr-ext-installed="">
+        <h1>CodeLess:</h1>
+        <p>
+            Load the Dialog CodeLess firmware on a development kit and use this Web Page to send and receive commands
+            via Web Bluetooth.<br />
+            Additional information:
+            <a href="https://www.dialog-semiconductor.com/products/smartbondtm-codeless-commands"
+                >CodeLess AT Commands</a
+            ><br />
+            Right click to view the source code of this implementation.
+        </p>
+        <button type="button" onclick="ble_connect()">Click me to scan for CodeLess BLE devices</button>
+        <br />
+        <button type="button" onclick="bleDisconnect()">Click me to disconnect</button>
+        <br />
+        <br />Log:<br />
+        <textarea id="log" rows="20" cols="60"></textarea>
+        <br /><br /><br />
+        <button type="button" onclick="sendAT('ATrI')">Send ATrI</button>
+        <br /><br />
+        <input type="text" id="cmd" onkeydown="wasEnter(this)" />
+        <button type="button" onclick="sendAT(document.getElementById('cmd').value)">Transmit Command</button>
+    </body>
+</html>
